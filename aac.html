@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>AAC 보드 (정렬/편집/탭추가/크기조절/내보내기)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      --icon-size: 40px;          /* 이모지/텍스트 아이콘 크기 */
+      --image-height: 110px;      /* 사진 카드 높이 */
+      --card-min-height: 130px;   /* 카드 전체 높이 */
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      background: #f4f6f8;
+      color: #333;
+    }
+
+    header {
+      background: #3498db;
+      color: white;
+      padding: 10px 12px 8px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+
+    .top-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+
+    /* 탭 영역 */
+    .tabs-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      border: none;
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-size: 12px;
+      background: rgba(255,255,255,0.2);
+      color: #ecf0f1;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tab:active {
+      cursor: grabbing;
+    }
+    .tab.active {
+      background: #fff;
+      color:#3498db;
+      font-weight: 600;
+    }
+    .tab.drag-over {
+      outline: 2px dashed #ecf0f1;
+    }
+    .tab-delete {
+      font-size: 10px;
+      border: none;
+      background: transparent;
+      color: #c0392b;
+      cursor: pointer;
+      padding: 0 2px;
+    }
+    .btn-tab-add {
+      border: none;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      background: rgba(0,0,0,0.15);
+      color:#ecf0f1;
+      cursor: pointer;
+      margin-top: 2px;
+      align-self: flex-start;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .btn-add {
+      background: #2ecc71;
+      color: #fff;
+    }
+    .btn-add:active { background:#27ae60; }
+
+    .btn-secondary {
+      background:#ecf0f1;
+      color:#34495e;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: flex-end;
+      flex: 1;
+    }
+
+    /* 크기 + 음성 설정 */
+    .size-controls {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+      font-size: 11px;
+      color: #ecf0f1;
+      justify-content: flex-end;
+    }
+    .size-controls label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .size-controls input[type="range"] {
+      width: 70px;
+    }
+    #voiceSelect {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: none;
+      max-width: 140px;
+    }
+
+    main {
+      padding: 8px;
+      padding-bottom: 80px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+      gap: 8px;
+    }
+
+    .card {
+      position: relative;
+      background: white;
+      border-radius: 12px;
+      padding: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 4px;
+      cursor: grab;
+      transition: transform 0.06s ease, box-shadow 0.06s ease, background 0.06s ease;
+      min-height: var(--card-min-height);
+      text-align: center;
+    }
+    .card:active {
+      cursor: grabbing;
+      transform: scale(0.97);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      background: #e8f4ff;
+    }
+    .card.dragging {
+      opacity: 0.7;
+    }
+    .card.drag-over {
+      outline: 2px dashed #3498db;
+    }
+
+    .card .icon {
+      font-size: var(--icon-size);
+      margin-bottom: 4px;
+    }
+    .card-img {
+      width: 100%;
+      height: var(--image-height);
+      object-fit: cover;
+      border-radius: 10px;
+      margin-bottom: 4px;
+    }
+    .label {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .sub {
+      font-size: 11px;
+      color:#7f8c8d;
+    }
+
+    /* 삭제/편집 버튼 */
+    .card-delete-btn,
+    .card-edit-btn {
+      position: absolute;
+      top: 4px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 3;
+    }
+    .card-delete-btn { right: 4px; }
+    .card-edit-btn   { right: 28px; }
+    .card-delete-btn:hover,
+    .card-edit-btn:hover { background: rgba(0,0,0,0.8); }
+    .card-delete-btn:active,
+    .card-edit-btn:active { transform: scale(0.9); }
+
+    .hint {
+      font-size: 11px;
+      color:#7f8c8d;
+      margin-bottom:6px;
+    }
+
+    /* 하단 문장창 */
+    .sentence-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #ffffff;
+      border-top: 1px solid #dde2e6;
+      padding: 6px 8px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .sentence-text {
+      flex: 1;
+      min-height: 38px;
+      font-size: 14px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid #ccd1d9;
+      background: #f7f9fb;
+      overflow-y: auto;
+      max-height: 70px;
+    }
+    .bottom-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      gap: 2px;
+      min-width: 48px;
+    }
+    .btn-speak {
+      background: #e67e22;
+      color: #fff;
+    }
+    .btn-speak:active { background:#d35400; }
+    .btn-clear {
+      background:#bdc3c7;
+      color:#2c3e50;
+    }
+    .btn-clear:active { background:#95a5a6; }
+    .bottom-btn span.small { font-size: 10px; }
+
+    /* 모달 공통 */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    .modal {
+      background:#fff;
+      border-radius: 12px;
+      padding: 12px;
+      width: min(360px, 92vw);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .modal h2 {
+      margin: 0 0 8px;
+      font-size: 16px;
+    }
+    .modal label {
+      font-size: 12px;
+      display:block;
+      margin-top:6px;
+      margin-bottom:2px;
+    }
+    .modal input[type="text"],
+    .modal textarea {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid #ccd1d9;
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+    .modal textarea {
+      resize: vertical;
+      min-height: 50px;
+    }
+    .modal input[type="file"] {
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .modal-footer {
+      display:flex;
+      justify-content:flex-end;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .btn-primary {
+      background:#3498db;
+      color:#fff;
+    }
+
+    @media (min-width: 600px) {
+      header h1 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>
+    <span>AAC 보드</span>
+    <span style="font-size:12px; opacity:0.9;">말하는 보드</span>
+  </h1>
+
+  <div class="top-row">
+    <!-- 탭 + 탭추가 -->
+    <div class="tabs-wrap">
+      <div class="tabs" id="tabs"></div>
+      <button class="btn-tab-add" id="btnAddTab">＋ 탭 추가</button>
+      <button class="btn btn-add" id="btnOpenAddModal">＋ 사용자 버튼 추가</button>
+      <!-- 데이터 내보내기 / 불러오기 버튼 -->
+      <button class="btn btn-secondary" id="btnExport">데이터 내보내기</button>
+      <label class="btn btn-secondary" style="cursor:pointer;">
+        데이터 불러오기
+        <input type="file" id="btnImport" accept="application/json" style="display:none;">
+      </label>
+    </div>
+
+    <!-- 크기 + 음성 설정 -->
+    <div class="header-actions">
+      <div class="size-controls">
+        <label>아이콘
+          <input type="range" id="iconSizeRange" min="28" max="72" value="40">
+        </label>
+        <label>사진
+          <input type="range" id="imgSizeRange" min="80" max="200" value="110">
+        </label>
+        <label>카드
+          <input type="range" id="cardSizeRange" min="90" max="220" value="130">
+        </label>
+      </div>
+      <div class="size-controls">
+        <label>볼륨
+          <input type="range" id="volumeRange" min="0" max="100" value="100">
+        </label>
+        <label>속도
+          <input type="range" id="rateRange" min="50" max="150" value="100">
+        </label>
+        <label>톤
+          <input type="range" id="pitchRange" min="50" max="150" value="100">
+        </label>
+        <label>목소리
+          <select id="voiceSelect">
+            <option value="">기본</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div id="hintStar" class="hint">
+    ⭐ 자주 쓰는 말은, 많이 누른 순서대로 자동으로 모여요.
+  </div>
+  <div id="tabContentsContainer"></div>
+</main>
+
+<!-- 하단 문장창 -->
+<div class="sentence-bar">
+  <div id="sentenceBox" class="sentence-text"></div>
+  <button class="bottom-btn btn-clear" id="btnClear">
+    <span>지우기</span>
+    <span class="small">전체</span>
+  </button>
+  <button class="bottom-btn btn-speak" id="btnSpeak">
+    <span>말하기</span>
+    <span class="small">전체</span>
+  </button>
+</div>
+
+<!-- 사용자 버튼 추가 모달 -->
+<div class="modal-backdrop" id="addModalBackdrop">
+  <div class="modal">
+    <h2>사용자 버튼 추가</h2>
+    <p style="font-size:11px; color:#7f8c8d;">
+      지금 선택한 탭에 새 버튼을 만들어요.
+    </p>
+
+    <label for="addText">말하고 싶은 문장</label>
+    <textarea id="addText" placeholder="예: 엄마 보고 싶어요."></textarea>
+
+    <label for="addSub">작은 설명 (선택)</label>
+    <input type="text" id="addSub" placeholder="예: 사진 설명 등">
+
+    <label for="addImage">사진 (선택)</label>
+    <input type="file" id="addImage" accept="image/*">
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" id="btnAddCancel">취소</button>
+      <button class="btn btn-primary" type="button" id="btnAddSave">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- 카드 편집 모달 -->
+<div class="modal-backdrop" id="editModalBackdrop">
+  <div class="modal">
+    <h2>카드 편집</h2>
+    <input type="hidden" id="editCardId">
+
+    <label for="editText">문장</label>
+    <textarea id="editText"></textarea>
+
+    <label for="editSub">작은 설명 (선택)</label>
+    <input type="text" id="editSub">
+
+    <label for="editImage">사진 바꾸기 (선택)</label>
+    <input type="file" id="editImage" accept="image/*">
+    <p style="font-size:11px; color:#7f8c8d;">
+      이미지를 선택하면 기존 아이콘/사진을 덮어씁니다.
+    </p>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" type="button" id="btnEditCancel">닫기</button>
+      <button class="btn btn-primary" type="button" id="btnEditSave">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== DOM =====
+  const tabsEl = document.getElementById('tabs');
+  const tabContentsContainer = document.getElementById('tabContentsContainer');
+  const hintStar = document.getElementById('hintStar');
+
+  const btnAddTab = document.getElementById('btnAddTab');
+  const btnOpenAddModal = document.getElementById('btnOpenAddModal');
+  const btnExport = document.getElementById('btnExport');
+  const btnImport = document.getElementById('btnImport');
+
+  const iconSizeRange = document.getElementById('iconSizeRange');
+  const imgSizeRange = document.getElementById('imgSizeRange');
+  const cardSizeRange = document.getElementById('cardSizeRange');
+  const volumeRange = document.getElementById('volumeRange');
+  const rateRange = document.getElementById('rateRange');
+  const pitchRange = document.getElementById('pitchRange');
+  const voiceSelect = document.getElementById('voiceSelect');
+
+  const sentenceBox = document.getElementById('sentenceBox');
+  const btnClear = document.getElementById('btnClear');
+  const btnSpeak = document.getElementById('btnSpeak');
+
+  const addModalBackdrop = document.getElementById('addModalBackdrop');
+  const addTextInput = document.getElementById('addText');
+  const addSubInput = document.getElementById('addSub');
+  const addImageInput = document.getElementById('addImage');
+  const btnAddCancel = document.getElementById('btnAddCancel');
+  const btnAddSave = document.getElementById('btnAddSave');
+
+  const editModalBackdrop = document.getElementById('editModalBackdrop');
+  const editCardIdInput = document.getElementById('editCardId');
+  const editTextInput = document.getElementById('editText');
+  const editSubInput = document.getElementById('editSub');
+  const editImageInput = document.getElementById('editImage');
+  const btnEditCancel = document.getElementById('btnEditCancel');
+  const btnEditSave = document.getElementById('btnEditSave');
+
+  // ===== 저장 키 =====
+  const STORAGE_TABS           = 'aac_tabs_v2';
+  const STORAGE_CARDS          = 'aac_cards_v2';
+  const STORAGE_USAGE_COUNTS   = 'aac_usage_counts_v2';
+  const STORAGE_SIZE_SETTINGS  = 'aac_size_settings_v3';
+  const STORAGE_AUDIO_SETTINGS = 'aac_audio_settings_v2';
+
+  // ===== 상태 =====
+  let tabsData = [];
+  let cards = [];
+  let usageCounts = {};
+  let activeTabId = null;
+
+  let availableVoices = [];
+  let selectedVoice = null;
+  let audioSettings = { volume: 1.0, rate: 1.0, pitch: 1.0 };
+
+  // drag 상태
+  let draggingTabId = null;
+  let draggingCardId = null;
+  let dragOverCardId = null;
+
+  // ===== 기본 탭/카드 =====
+  const DEFAULT_TABS = [
+    { id:'star',     name:'⭐ 자주',  isDefault:true, order:0 },
+    { id:'home',     name:'🏠 집',   isDefault:true, order:1 },
+    { id:'school',   name:'🏫 학교', isDefault:true, order:2 },
+    { id:'hospital', name:'🏥 병원', isDefault:true, order:3 },
+  ];
+
+  const DEFAULT_CARDS_BASE = [
+    { tabId:'home', text:'밥 먹고 싶어요.', sub:'배고파요', icon:'🍚' },
+    { tabId:'home', text:'물 마시고 싶어요.', sub:'목말라요', icon:'💧' },
+    { tabId:'home', text:'화장실 가고 싶어요.', sub:'급해요', icon:'🚻' },
+    { tabId:'home', text:'쉬고 싶어요.', sub:'피곤해요', icon:'🛏️' },
+    { tabId:'home', text:'TV 보고 싶어요.', sub:'놀고 싶어요', icon:'📺' },
+    { tabId:'school', text:'선생님 부르기', sub:'선생님이 필요해요', icon:'👩‍🏫' },
+    { tabId:'school', text:'친구랑 놀고 싶어요.', sub:'같이 놀자', icon:'🧒' },
+    { tabId:'school', text:'숙제 도와주세요.', sub:'어려워요', icon:'📚' },
+    { tabId:'school', text:'쉬는 시간이에요?', sub:'쉬고 싶어요', icon:'⏰' },
+    { tabId:'school', text:'아파요.', sub:'몸이 이상해요', icon:'🤒' },
+    { tabId:'hospital', text:'어디가 아픈지 말하고 싶어요.', sub:'증상 설명', icon:'🩺' },
+    { tabId:'hospital', text:'주사 싫어요.', sub:'무서워요', icon:'💉' },
+    { tabId:'hospital', text:'쉬고 싶어요.', sub:'누워 있고 싶어요', icon:'🛌' },
+    { tabId:'hospital', text:'물 주세요.', sub:'목말라요', icon:'🥤' },
+    { tabId:'hospital', text:'배가 아파요.', sub:'배 통증', icon:'🤢' },
+  ];
+
+  function uuid() {
+    return 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+  }
+
+  // ===== 저장/불러오기 (탭/카드/사용기록/크기/오디오) =====
+  function loadTabsAndCards() {
+    const savedTabs = localStorage.getItem(STORAGE_TABS);
+    const savedCards = localStorage.getItem(STORAGE_CARDS);
+
+    if (savedTabs && savedCards) {
+      try {
+        tabsData = JSON.parse(savedTabs);
+        cards    = JSON.parse(savedCards);
+        // order 값 없을 수도 있으니 재정렬
+        tabsData.sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
+        cards.sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
+        return;
+      } catch {}
+    }
+
+    // 초기값 세팅
+    tabsData = JSON.parse(JSON.stringify(DEFAULT_TABS));
+    cards = DEFAULT_CARDS_BASE.map((c, idx) => ({
+      id: 'base-' + c.tabId + '-' + idx,
+      tabId: c.tabId,
+      text: c.text,
+      sub: c.sub || '',
+      icon: c.icon || '',
+      imageData: null,
+      isDefault: true,
+      order: idx
+    }));
+    saveTabsAndCards();
+  }
+
+  function saveTabsAndCards() {
+    localStorage.setItem(STORAGE_TABS, JSON.stringify(tabsData));
+    localStorage.setItem(STORAGE_CARDS, JSON.stringify(cards));
+  }
+
+  function loadUsageCounts() {
+    const saved = localStorage.getItem(STORAGE_USAGE_COUNTS);
+    if (saved) {
+      try { usageCounts = JSON.parse(saved); }
+      catch { usageCounts = {}; }
+    }
+  }
+  function saveUsageCounts() {
+    localStorage.setItem(STORAGE_USAGE_COUNTS, JSON.stringify(usageCounts));
+  }
+
+  function loadSizeSettings() {
+    const saved = localStorage.getItem(STORAGE_SIZE_SETTINGS);
+    if (saved) {
+      try {
+        const s = JSON.parse(saved);
+        if (s.iconSize) {
+          iconSizeRange.value = s.iconSize;
+          document.documentElement.style.setProperty('--icon-size', s.iconSize + 'px');
+        }
+        if (s.imgHeight) {
+          imgSizeRange.value = s.imgHeight;
+          document.documentElement.style.setProperty('--image-height', s.imgHeight + 'px');
+        }
+        if (s.cardHeight) {
+          cardSizeRange.value = s.cardHeight;
+          document.documentElement.style.setProperty('--card-min-height', s.cardHeight + 'px');
+        }
+      } catch {}
+    } else {
+      document.documentElement.style.setProperty('--icon-size', iconSizeRange.value + 'px');
+      document.documentElement.style.setProperty('--image-height', imgSizeRange.value + 'px');
+      document.documentElement.style.setProperty('--card-min-height', cardSizeRange.value + 'px');
+    }
+  }
+  function saveSizeSettings() {
+    const s = {
+      iconSize: parseInt(iconSizeRange.value, 10),
+      imgHeight: parseInt(imgSizeRange.value, 10),
+      cardHeight: parseInt(cardSizeRange.value, 10)
+    };
+    localStorage.setItem(STORAGE_SIZE_SETTINGS, JSON.stringify(s));
+  }
+  iconSizeRange.addEventListener('input', () => {
+    document.documentElement.style.setProperty('--icon-size', iconSizeRange.value + 'px');
+    saveSizeSettings();
+  });
+  imgSizeRange.addEventListener('input', () => {
+    document.documentElement.style.setProperty('--image-height', imgSizeRange.value + 'px');
+    saveSizeSettings();
+  });
+  cardSizeRange.addEventListener('input', () => {
+    document.documentElement.style.setProperty('--card-min-height', cardSizeRange.value + 'px');
+    saveSizeSettings();
+  });
+
+  function loadAudioSettings() {
+    const saved = localStorage.getItem(STORAGE_AUDIO_SETTINGS);
+    if (saved) {
+      try { audioSettings = JSON.parse(saved); }
+      catch { audioSettings = { volume:1.0, rate:1.0, pitch:1.0 }; }
+    }
+    volumeRange.value = Math.round((audioSettings.volume ?? 1.0) * 100);
+    rateRange.value   = Math.round((audioSettings.rate   ?? 1.0) * 100);
+    pitchRange.value  = Math.round((audioSettings.pitch  ?? 1.0) * 100);
+  }
+  function saveAudioSettings() {
+    localStorage.setItem(STORAGE_AUDIO_SETTINGS, JSON.stringify(audioSettings));
+  }
+  volumeRange.addEventListener('input', () => {
+    audioSettings.volume = parseInt(volumeRange.value, 10) / 100;
+    saveAudioSettings();
+  });
+  rateRange.addEventListener('input', () => {
+    audioSettings.rate = parseInt(rateRange.value, 10) / 100;
+    saveAudioSettings();
+  });
+  pitchRange.addEventListener('input', () => {
+    audioSettings.pitch = parseInt(pitchRange.value, 10) / 100;
+    saveAudioSettings();
+  });
+
+  // ===== 음성 =====
+  function loadVoices() {
+    if (!window.speechSynthesis) return;
+    availableVoices = window.speechSynthesis.getVoices();
+    if (!availableVoices.length) return;
+
+    voiceSelect.innerHTML = '<option value="">기본</option>';
+
+    const ko = availableVoices.filter(v => v.lang && v.lang.startsWith('ko'));
+    const other = availableVoices.filter(v => !v.lang || !v.lang.startsWith('ko'));
+
+    function addGroup(list, label) {
+      if (!list.length) return;
+      const og = document.createElement('optgroup');
+      og.label = label;
+      list.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        opt.textContent = v.name + (v.default ? ' (기본)' : '');
+        og.appendChild(opt);
+      });
+      voiceSelect.appendChild(og);
+    }
+    addGroup(ko, '한국어');
+    addGroup(other, '기타');
+
+    if (audioSettings.voiceName) {
+      voiceSelect.value = audioSettings.voiceName;
+      selectedVoice = availableVoices.find(v => v.name === audioSettings.voiceName) || null;
+    }
+
+    voiceSelect.addEventListener('change', () => {
+      const name = voiceSelect.value;
+      selectedVoice = availableVoices.find(v => v.name === name) || null;
+      audioSettings.voiceName = name || null;
+      saveAudioSettings();
+    });
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    setTimeout(loadVoices, 300);
+  }
+
+  // ===== 렌더링 =====
+  function renderTabs() {
+    tabsEl.innerHTML = '';
+    tabsData.sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
+
+    tabsData.forEach(tab => {
+      const btn = document.createElement('button');
+      btn.className = 'tab';
+      btn.dataset.id = tab.id;
+      btn.draggable = true;
+      btn.textContent = tab.name;
+
+      if (tab.id === activeTabId) btn.classList.add('active');
+
+      if (!tab.isDefault && tab.id !== 'star') {
+        const del = document.createElement('button');
+        del.className = 'tab-delete';
+        del.type = 'button';
+        del.textContent = '🗑';
+        del.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (!confirm(`"${tab.name}" 탭과 안의 카드들을 삭제할까요?`)) return;
+          tabsData = tabsData.filter(t => t.id !== tab.id);
+          cards = cards.filter(c => c.tabId !== tab.id);
+          saveTabsAndCards();
+          if (activeTabId === tab.id) activeTabId = 'home';
+          renderAll();
+        });
+        btn.appendChild(del);
+      }
+
+      // 클릭 = 탭 전환
+      btn.addEventListener('click', () => {
+        const targetId = tab.id;
+        if (activeTabId === targetId) return;
+        activeTabId = targetId;
+        renderAll();
+      });
+
+      // 드래그 이벤트
+      btn.addEventListener('dragstart', (e) => {
+        draggingTabId = tab.id;
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      btn.addEventListener('dragend', () => {
+        draggingTabId = null;
+        document.querySelectorAll('.tab.drag-over').forEach(el => el.classList.remove('drag-over'));
+      });
+      btn.addEventListener('dragover', (e) => {
+        if (!draggingTabId || draggingTabId === tab.id) return;
+        e.preventDefault();
+        btn.classList.add('drag-over');
+      });
+      btn.addEventListener('dragleave', () => {
+        btn.classList.remove('drag-over');
+      });
+      btn.addEventListener('drop', (e) => {
+        e.preventDefault();
+        btn.classList.remove('drag-over');
+        if (!draggingTabId || draggingTabId === tab.id) return;
+        // 순서 재배열
+        const fromIndex = tabsData.findIndex(t => t.id === draggingTabId);
+        const toIndex   = tabsData.findIndex(t => t.id === tab.id);
+        if (fromIndex === -1 || toIndex === -1) return;
+        const [moved] = tabsData.splice(fromIndex, 1);
+        tabsData.splice(toIndex, 0, moved);
+        // order 다시 부여
+        tabsData.forEach((t,i) => t.order = i);
+        saveTabsAndCards();
+        renderTabs();
+      });
+
+      tabsEl.appendChild(btn);
+    });
+  }
+
+  function renderTabContents() {
+    tabContentsContainer.innerHTML = '';
+
+    tabsData.forEach(tab => {
+      const grid = document.createElement('div');
+      grid.id = `content-${tab.id}`;
+      grid.className = 'grid';
+      grid.style.display = (activeTabId === tab.id) ? 'grid' : 'none';
+
+      if (tab.id === 'star') {
+        renderStarTab(grid);
+      } else {
+        const list = cards
+          .filter(c => c.tabId === tab.id)
+          .sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
+        list.forEach(card => {
+          grid.appendChild(createCardElement(card));
+        });
+      }
+      tabContentsContainer.appendChild(grid);
+    });
+
+    hintStar.style.display = (activeTabId === 'star') ? 'block' : 'none';
+  }
+
+  function renderStarTab(container) {
+    container.innerHTML = '';
+    const arr = Object.entries(usageCounts)
+      .sort((a,b) => b[1] - a[1])
+      .slice(0, 20);
+
+    if (!arr.length) {
+      const msg = document.createElement('div');
+      msg.style.fontSize = '12px';
+      msg.style.color = '#95a5a6';
+      msg.textContent = '아직 자주 쓰는 말이 없어요. 위 탭에서 말을 많이 눌러보면 이곳에 모여요.';
+      container.appendChild(msg);
+      return;
+    }
+
+    arr.forEach(([text, count]) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.dataset.say = text;
+      card.draggable = false; // 별 탭 카드는 정렬 X
+
+      const icon = document.createElement('div');
+      icon.className = 'icon';
+      icon.textContent = '⭐';
+
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = text;
+
+      const sub = document.createElement('div');
+      sub.className = 'sub';
+      sub.textContent = `사용 횟수: ${count}`;
+
+      card.appendChild(icon);
+      card.appendChild(label);
+      card.appendChild(sub);
+      card.addEventListener('click', () => onCardClick(text));
+
+      container.appendChild(card);
+    });
+  }
+
+  function createCardElement(cardData) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.dataset.id = cardData.id;
+    el.dataset.say = cardData.text;
+    el.draggable = true;
+
+    // 편집 버튼
+    const editBtn = document.createElement('button');
+    editBtn.className = 'card-edit-btn';
+    editBtn.type = 'button';
+    editBtn.textContent = '⋮';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openEditModal(cardData.id);
+    });
+    el.appendChild(editBtn);
+
+    // 삭제 버튼
+    const delBtn = document.createElement('button');
+    delBtn.className = 'card-delete-btn';
+    delBtn.type = 'button';
+    delBtn.textContent = '×';
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!confirm('이 버튼을 삭제할까요?')) return;
+      cards = cards.filter(c => c.id !== cardData.id);
+      saveTabsAndCards();
+      renderAll();
+    });
+    el.appendChild(delBtn);
+
+    // 이미지 or 아이콘
+    if (cardData.imageData) {
+      const img = document.createElement('img');
+      img.className = 'card-img';
+      img.src = cardData.imageData;
+      img.alt = cardData.text;
+      el.appendChild(img);
+    } else if (cardData.icon) {
+      const icon = document.createElement('div');
+      icon.className = 'icon';
+      icon.textContent = cardData.icon;
+      el.appendChild(icon);
+    } else {
+      const icon = document.createElement('div');
+      icon.className = 'icon';
+      icon.textContent = '🖼️';
+      el.appendChild(icon);
+    }
+
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = cardData.text;
+    el.appendChild(label);
+
+    if (cardData.sub) {
+      const sub = document.createElement('div');
+      sub.className = 'sub';
+      sub.textContent = cardData.sub;
+      el.appendChild(sub);
+    }
+
+    el.addEventListener('click', () => onCardClick(cardData.text));
+
+    // 카드 드래그 정렬
+    el.addEventListener('dragstart', (e) => {
+      draggingCardId = cardData.id;
+      dragOverCardId = null;
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => {
+      draggingCardId = null;
+      dragOverCardId = null;
+      document.querySelectorAll('.card.drag-over').forEach(c => c.classList.remove('drag-over'));
+      document.querySelectorAll('.card.dragging').forEach(c => c.classList.remove('dragging'));
+    });
+    el.addEventListener('dragover', (e) => {
+      if (!draggingCardId || draggingCardId === cardData.id) return;
+      e.preventDefault();
+      el.classList.add('drag-over');
+      dragOverCardId = cardData.id;
+    });
+    el.addEventListener('dragleave', () => {
+      el.classList.remove('drag-over');
+    });
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      if (!draggingCardId || draggingCardId === cardData.id) return;
+
+      const sameTabCards = cards
+        .filter(c => c.tabId === cardData.tabId)
+        .sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
+      const fromIndex = sameTabCards.findIndex(c => c.id === draggingCardId);
+      const toIndex   = sameTabCards.findIndex(c => c.id === cardData.id);
+      if (fromIndex === -1 || toIndex === -1) return;
+
+      const [moved] = sameTabCards.splice(fromIndex, 1);
+      sameTabCards.splice(toIndex, 0, moved);
+      sameTabCards.forEach((c,i) => c.order = i);
+
+      // 전체 cards에 order 반영
+      cards.forEach(c => {
+        const updated = sameTabCards.find(sc => sc.id === c.id);
+        if (updated) c.order = updated.order;
+      });
+
+      saveTabsAndCards();
+      renderAll();
+    });
+
+    return el;
+  }
+
+  function renderAll() {
+    renderTabs();
+    renderTabContents();
+  }
+
+  // ===== 카드 클릭 =====
+  function onCardClick(text) {
+    if (sentenceBox.textContent.trim()) {
+      sentenceBox.textContent += ' ' + text;
+    } else {
+      sentenceBox.textContent = text;
+    }
+    speak(text);
+    usageCounts[text] = (usageCounts[text] || 0) + 1;
+    saveUsageCounts();
+    if (activeTabId === 'star') renderAll();
+  }
+
+  // ===== 문장창 =====
+  btnClear.addEventListener('click', () => {
+    sentenceBox.textContent = '';
+  });
+  btnSpeak.addEventListener('click', () => {
+    const text = sentenceBox.textContent.trim();
+    if (!text) return;
+    speak(text);
+  });
+
+  // ===== TTS =====
+  function speak(text) {
+    if (!window.speechSynthesis) {
+      alert('이 브라우저는 음성 합성을 지원하지 않습니다.');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR';
+    u.rate = audioSettings.rate ?? 1.0;
+    u.pitch = audioSettings.pitch ?? 1.0;
+    u.volume = audioSettings.volume ?? 1.0;
+    if (selectedVoice) {
+      u.voice = selectedVoice;
+      if (!u.voice.lang) u.lang = 'ko-KR';
+    }
+    window.speechSynthesis.speak(u);
+  }
+
+  // ===== 탭 추가 =====
+  btnAddTab.addEventListener('click', () => {
+    const name = prompt('새 탭 이름을 입력해 주세요.\n예: 놀이, 밖에, 가족');
+    if (!name) return;
+    const id = 'tab-' + uuid();
+    const order = tabsData.length ? Math.max(...tabsData.map(t => t.order ?? 0)) + 1 : 0;
+    tabsData.push({ id, name, isDefault:false, order });
+    saveTabsAndCards();
+    activeTabId = id;
+    renderAll();
+  });
+
+  // ===== 사용자 카드 추가 =====
+  function openAddModal() {
+    if (activeTabId === 'star') {
+      alert('⭐ 자주 탭이 아닌, 다른 탭에서 버튼을 추가해 주세요.');
+      return;
+    }
+    addTextInput.value = '';
+    addSubInput.value = '';
+    addImageInput.value = '';
+    addModalBackdrop.style.display = 'flex';
+  }
+  function closeAddModal() {
+    addModalBackdrop.style.display = 'none';
+  }
+  btnOpenAddModal.addEventListener('click', openAddModal);
+  btnAddCancel.addEventListener('click', closeAddModal);
+  addModalBackdrop.addEventListener('click', (e) => {
+    if (e.target === addModalBackdrop) closeAddModal();
+  });
+
+  btnAddSave.addEventListener('click', () => {
+    const text = addTextInput.value.trim();
+    const sub  = addSubInput.value.trim();
+    const file = addImageInput.files[0] || null;
+    if (!text) {
+      alert('말하고 싶은 문장을 입력해 주세요.');
+      return;
+    }
+    const sameTabCards = cards.filter(c => c.tabId === activeTabId);
+    const nextOrder = sameTabCards.length ? Math.max(...sameTabCards.map(c => c.order ?? 0)) + 1 : 0;
+
+    function finalize(imageData) {
+      cards.push({
+        id: uuid(),
+        tabId: activeTabId,
+        text,
+        sub,
+        icon: '',
+        imageData: imageData || null,
+        isDefault: false,
+        order: nextOrder
+      });
+      saveTabsAndCards();
+      closeAddModal();
+      renderAll();
+    }
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = e => finalize(e.target.result);
+      reader.readAsDataURL(file);
+    } else {
+      finalize(null);
+    }
+  });
+
+  // ===== 카드 편집 =====
+  function openEditModal(cardId) {
+    const card = cards.find(c => c.id === cardId);
+    if (!card) return;
+    editCardIdInput.value = card.id;
+    editTextInput.value = card.text;
+    editSubInput.value = card.sub || '';
+    editImageInput.value = '';
+    editModalBackdrop.style.display = 'flex';
+  }
+  function closeEditModal() {
+    editModalBackdrop.style.display = 'none';
+  }
+  btnEditCancel.addEventListener('click', closeEditModal);
+  editModalBackdrop.addEventListener('click', (e) => {
+    if (e.target === editModalBackdrop) closeEditModal();
+  });
+
+  btnEditSave.addEventListener('click', () => {
+    const id = editCardIdInput.value;
+    const card = cards.find(c => c.id === id);
+    if (!card) {
+      closeEditModal();
+      return;
+    }
+    const newText = editTextInput.value.trim();
+    const newSub  = editSubInput.value.trim();
+    const file    = editImageInput.files[0] || null;
+    if (!newText) {
+      alert('문장을 입력해 주세요.');
+      return;
+    }
+
+    function finalize(imageData) {
+      card.text = newText;
+      card.sub  = newSub;
+      if (imageData) {
+        card.imageData = imageData;
+      }
+      saveTabsAndCards();
+      closeEditModal();
+      renderAll();
+    }
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = e => finalize(e.target.result);
+      reader.readAsDataURL(file);
+    } else {
+      finalize(null);
+    }
+  });
+
+  // ===== 데이터 내보내기 / 불러오기 =====
+  function exportData() {
+    const data = {
+      version: 1,
+      tabsData,
+      cards,
+      usageCounts,
+      sizeSettings: JSON.parse(localStorage.getItem(STORAGE_SIZE_SETTINGS) || 'null'),
+      audioSettings
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    const date = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    a.href = url;
+    a.download = `aac-board-backup-${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function importDataFromFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (!data.tabsData || !data.cards) {
+          alert('형식이 올바르지 않은 파일입니다.');
+          return;
+        }
+
+        // 기존 데이터 덮어쓰기
+        tabsData    = data.tabsData;
+        cards       = data.cards;
+        usageCounts = data.usageCounts || {};
+
+        // 저장
+        saveTabsAndCards();
+        saveUsageCounts();
+
+        if (data.sizeSettings) {
+          localStorage.setItem(STORAGE_SIZE_SETTINGS, JSON.stringify(data.sizeSettings));
+        }
+        if (data.audioSettings) {
+          audioSettings = data.audioSettings;
+          saveAudioSettings();
+        }
+
+        // UI 다시 로드
+        loadSizeSettings();
+        loadAudioSettings();
+        activeTabId = 'home';
+        renderAll();
+
+        alert('데이터를 불러왔습니다. (탭/카드 구성이 복원되었습니다)');
+      } catch (err) {
+        console.error(err);
+        alert('데이터를 읽는 중 오류가 발생했습니다.');
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  }
+
+  btnExport.addEventListener('click', exportData);
+
+  btnImport.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!confirm('이 파일의 내용으로 현재 탭/카드 구성을 덮어쓸까요?')) {
+      e.target.value = '';
+      return;
+    }
+    importDataFromFile(file);
+    e.target.value = ''; // 같은 파일 다시 선택 가능하도록 초기화
+  });
+
+  // ===== 초기 실행 =====
+  function init() {
+    loadTabsAndCards();
+    loadUsageCounts();
+    loadSizeSettings();
+    loadAudioSettings();
+    activeTabId = activeTabId || 'home';
+    renderAll();
+  }
+  document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
